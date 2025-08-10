@@ -9,6 +9,74 @@
         .doc-entry { cursor: pointer; }
         .doc-entry.selected { background: #e6f7ff; }
         #ocr-text { white-space: pre-wrap; }
+        
+        /* Split layout styles */
+        .split-container {
+            display: flex;
+            height: 80vh;
+            border: 1px solid #ddd;
+            overflow: hidden;
+        }
+        
+        .split-left {
+            flex: 0 0 50%;
+            padding: 15px;
+            overflow-y: auto;
+            background-color: #f8f9fa;
+        }
+        
+        .split-right {
+            flex: 1;
+            padding: 15px;
+            overflow-y: auto;
+            background-color: #ffffff;
+        }
+        
+        .divider {
+            width: 5px;
+            background-color: #dee2e6;
+            cursor: col-resize;
+            position: relative;
+            flex-shrink: 0;
+        }
+        
+        .divider:hover {
+            background-color: #6c757d;
+        }
+        
+        .divider::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 2px;
+            height: 30px;
+            background-color: #6c757d;
+        }
+        
+        #pdf-container {
+            width: 100%;
+            height: 600px;
+            border: 1px solid #ddd;
+            margin-top: 10px;
+        }
+        
+        #pdf-frame {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+        
+        .pdf-placeholder {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            background-color: #f8f9fa;
+            color: #6c757d;
+            font-style: italic;
+        }
     </style>
 </head>
 <body>
@@ -22,11 +90,22 @@
         <div class="col-md-9">
             <div id="doc-details" class="mb-4">
                 <h5 id="selected-filename">(Select a document)</h5>
-                <strong>Extracted Text:</strong>
-                <div id="ocr-text" class="border p-2 bg-light" style="min-height:120px;">(none)</div>
-                <div class="my-3">
-                    <button id="flag-btn" class="btn btn-warning" style="display:none;">Flag for Reprocessing</button>
-                    <span id="flagged-label" class="badge bg-danger" style="display:none;">Flagged for Reprocessing</span>
+                <div class="split-container">
+                    <div class="split-left">
+                        <strong>Extracted Text:</strong>
+                        <div id="ocr-text" class="border p-2 bg-light mt-2" style="min-height:400px;">(none)</div>
+                        <div class="my-3">
+                            <button id="flag-btn" class="btn btn-warning" style="display:none;">Flag for Reprocessing</button>
+                            <span id="flagged-label" class="badge bg-danger" style="display:none;">Flagged for Reprocessing</span>
+                        </div>
+                    </div>
+                    <div class="divider" id="divider"></div>
+                    <div class="split-right">
+                        <strong>PDF Preview:</strong>
+                        <div id="pdf-container">
+                            <div class="pdf-placeholder">Select a document to view PDF</div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -35,6 +114,36 @@
 <script>
 let docListCache = [];
 let selectedFilename = null;
+let isResizing = false;
+
+// Resizing functionality
+document.getElementById('divider').addEventListener('mousedown', function(e) {
+    isResizing = true;
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    e.preventDefault();
+});
+
+function handleMouseMove(e) {
+    if (!isResizing) return;
+    
+    const container = document.querySelector('.split-container');
+    const rect = container.getBoundingClientRect();
+    const offsetX = e.clientX - rect.left;
+    const percentage = (offsetX / rect.width) * 100;
+    
+    // Constrain between 20% and 80%
+    const constrainedPercentage = Math.max(20, Math.min(80, percentage));
+    
+    const leftPane = document.querySelector('.split-left');
+    leftPane.style.flex = `0 0 ${constrainedPercentage}%`;
+}
+
+function handleMouseUp() {
+    isResizing = false;
+    document.removeEventListener('mousemove', handleMouseMove);
+    document.removeEventListener('mouseup', handleMouseUp);
+}
 
 function fetchDocuments(selectFirst = false) {
     fetch('/api/documents')
@@ -68,6 +177,10 @@ function loadDocumentDetail(filename) {
     document.getElementById('selected-filename').textContent = filename;
     const doc = docListCache.find(d => d.filename === filename);
     document.getElementById('ocr-text').textContent = doc && doc.extracted_text ? doc.extracted_text : '[No extracted text found.]';
+    
+    // Load PDF
+    loadPDF(filename);
+    
     let flagBtn = document.getElementById('flag-btn');
     let flaggedLabel = document.getElementById('flagged-label');
     flagBtn.style.display = '';
@@ -78,6 +191,16 @@ function loadDocumentDetail(filename) {
         flagBtn.textContent = 'Flag for Reprocessing';
         flaggedLabel.style.display = 'none';
     }
+}
+
+function loadPDF(filename) {
+    const pdfContainer = document.getElementById('pdf-container');
+    const pdfUrl = '/api/document/' + encodeURIComponent(filename) + '/pdf';
+    
+    // Create iframe for PDF
+    pdfContainer.innerHTML = `<iframe id="pdf-frame" src="${pdfUrl}" type="application/pdf">
+        <div class="pdf-placeholder">PDF cannot be displayed. <a href="${pdfUrl}" target="_blank">Download PDF</a></div>
+    </iframe>`;
 }
 
 document.getElementById('flag-btn').onclick = function() {
