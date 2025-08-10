@@ -39,9 +39,9 @@ class NewFileHandler(FileSystemEventHandler):
         if file_path.lower().endswith(('.pdf', '.tif', '.tiff')):
             print(f"New file detected: {file_path}")
             wait_for_file_release(file_path, timeout=60)  # Adjust timeout as needed
-            file_name, doc_type, extracted_text = process_document(file_path)
-            insert_document(file_name, doc_type, extracted_text)
-            print(f"Processed {file_name} as {doc_type}")
+            final_file_path, doc_type, extracted_text = process_document(file_path)
+            insert_document(final_file_path, doc_type, extracted_text)
+            print(f"Processed {os.path.basename(final_file_path)} as {doc_type}, stored in {final_file_path}")
 
 if __name__ == "__main__":
     if not os.path.isdir(WATCH_DIR):

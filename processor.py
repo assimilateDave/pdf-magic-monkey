@@ -8,14 +8,26 @@ import pytesseract
 pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
 # Define your working directories here
-WATCH_DIR = os.path.abspath(r"C:\PDF-Processing\PDF_IN")
-WORK_DIR = os.path.abspath(r"C:\PDF-Processing\PDF_working")
+WATCH_DIR = os.path.abspath(r"C:\PDF-Processing\PDF_IN")    # Input folder for new documents
+WORK_DIR = os.path.abspath(r"C:\PDF-Processing\PDF_working")  # Temporary processing folder
+FINAL_DIR = os.path.abspath(r"C:\PDF-Processing\PDF_final")   # Final storage for processed documents
 
 def move_to_work_folder(file_path):
     """Move file from the watch folder to the work folder."""
     if not os.path.isdir(WORK_DIR):
         os.makedirs(WORK_DIR)
     dest_path = os.path.join(WORK_DIR, os.path.basename(file_path))
+    shutil.move(file_path, dest_path)
+    return dest_path
+
+def move_to_final_folder(file_path):
+    """
+    Move file from the work folder to the final folder after successful processing.
+    Creates the final directory if it doesn't exist (backward compatibility).
+    """
+    if not os.path.isdir(FINAL_DIR):
+        os.makedirs(FINAL_DIR)
+    dest_path = os.path.join(FINAL_DIR, os.path.basename(file_path))
     shutil.move(file_path, dest_path)
     return dest_path
 
@@ -117,7 +129,13 @@ def extract_text_from_tif(file_path):
 def process_document(file_path):
     """
     Process the document: move to work folder, extract text, classify the document,
-    and return the results.
+    move to final folder, and return the results including final file path.
+    
+    NEW WORKFLOW:
+    1. Move file from WATCH_DIR to WORK_DIR for processing
+    2. Extract text and classify the document
+    3. Move file from WORK_DIR to FINAL_DIR after successful processing
+    4. Return final file path (not just basename) for database storage
     """
     print("PROCESS_DOCUMENT CALLED")
     work_file = move_to_work_folder(file_path)
@@ -130,4 +148,8 @@ def process_document(file_path):
         print("Unsupported file format")
     
     document_type = classify_document(work_file, extracted_text)
-    return os.path.basename(work_file), document_type, extracted_text
+    
+    # Move to final folder after successful processing
+    final_file = move_to_final_folder(work_file)
+    
+    return final_file, document_type, extracted_text

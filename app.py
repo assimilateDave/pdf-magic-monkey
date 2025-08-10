@@ -20,7 +20,8 @@ def get_all_documents():
     return [
         {
             "id": doc["id"],
-            "filename": doc["file_name"],
+            "filename": doc["basename"] or os.path.basename(doc["file_name"]),  # Show basename for UI
+            "file_path": doc["file_name"],  # Full path to final location
             "basename": doc["basename"],
             "extracted_text": doc["extracted_text"],
             "flagged": bool(doc["flagged_for_reprocessing"])
