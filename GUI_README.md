@@ -26,9 +26,9 @@ pip install flask
   ```
 
 #### 3. **Check your folders**
-- Make sure your processed documents are in `C:\PDF-Processing\PDF_working`
+- Make sure your processed documents are in `C:\PDF-Processing\PDF_final` ⭐ **(UPDATED)**
 - Make sure your debug images are in `C:\PDF-Processing\debug_imgs`
-- (Optional) If you save extracted text as `.txt` files in `PDF_working`, the GUI will display them automatically.
+- (Optional) If you save extracted text as `.txt` files in `PDF_final`, the GUI will display them automatically.
 
 #### 4. **Run the web server**
 In your project folder, open a command prompt and run:
@@ -54,9 +54,15 @@ http://localhost:5000
 
 ### Troubleshooting
 
-- If you see `[No extracted text file found.]`, check if `.txt` files are being saved in `PDF_working` with the same name as the document.
+- If you see `[No extracted text file found.]`, check if `.txt` files are being saved in `PDF_final` with the same name as the document. ⭐ **(UPDATED)**
 - If you see no debug images, check that images are actually being saved in the debug folder and named with the document basename.
 - To stop the server, return to your command prompt and press `Ctrl+C`.
+
+---
+
+### Recent Updates
+
+⭐ **NEW WORKFLOW**: Documents are now stored in `C:\PDF-Processing\PDF_final` after successful processing, instead of remaining in `PDF_working`. The web interface automatically serves documents from the new final location.
 
 ---
 
