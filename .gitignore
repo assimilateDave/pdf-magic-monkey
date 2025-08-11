@@ -6,6 +6,7 @@ __pycache__/
 .Python
 
 # Database files
+*.db
 *.db-journal
 
 # IDE files

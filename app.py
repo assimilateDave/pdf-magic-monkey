@@ -1,8 +1,9 @@
 import os
 import sqlite3
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, send_file, abort
 
 DB_PATH = "documents.db"
+FINAL_DIR = os.path.abspath(r"C:\PDF-Processing\PDF_final")  # Final storage for processed documents
 
 def get_db_connection():
     conn = sqlite3.connect(DB_PATH)
@@ -71,6 +72,36 @@ def api_flag_document(basename):
     flag_value = data.get("flag", False)
     set_flag_for_reprocessing(basename, flag_value)
     return jsonify({"success": True})
+
+@app.route("/api/document/<basename>/pdf")
+def api_document_pdf(basename):
+    """Serve PDF file from the FINAL_DIR"""
+    # First, find the document in the database to get the full file path
+    conn = get_db_connection()
+    doc = conn.execute(
+        "SELECT file_name FROM documents WHERE basename = ?",
+        (basename,)
+    ).fetchone()
+    conn.close()
+    
+    if not doc:
+        abort(404, description="Document not found")
+    
+    file_path = doc["file_name"]
+    
+    # Check if the file exists
+    if not os.path.exists(file_path):
+        # Fallback: try to find the file in FINAL_DIR using basename
+        fallback_path = os.path.join(FINAL_DIR, basename)
+        if os.path.exists(fallback_path):
+            file_path = fallback_path
+        else:
+            abort(404, description="PDF file not found")
+    
+    try:
+        return send_file(file_path, mimetype='application/pdf')
+    except Exception as e:
+        abort(500, description=f"Error serving PDF: {str(e)}")
 
 if __name__ == "__main__":
     app.run(debug=True)
