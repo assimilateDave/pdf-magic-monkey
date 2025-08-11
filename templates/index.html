@@ -30,6 +30,7 @@
         #doc-list { max-height: 60vh; overflow-y: auto; }
         .doc-entry { cursor: pointer; }
         .doc-entry.selected { background: #e6f7ff; }
+        .highlight { background: yellow; color: black; }
     </style>
 </head>
 <body>
@@ -45,6 +46,11 @@
                 <div id="top-panel">
                     <h5 id="selected-filename">(Select a document)</h5>
                     <strong>Extracted Text:</strong>
+                    <div class="input-group mb-2">
+                        <input id="search-text" type="text" class="form-control" placeholder="Search extracted text...">
+                        <button id="clear-search" class="btn btn-outline-secondary" type="button">Clear</button>
+                        <span id="search-count" class="input-group-text" style="min-width:70px;display:none;"></span>
+                    </div>
                     <div id="ocr-text">(none)</div>
                     <div class="my-3">
                         <button id="flag-btn" class="btn btn-warning" style="display:none;">Flag for Reprocessing</button>
@@ -69,6 +75,7 @@
 let docListCache = [];
 let selectedFilename = null;
 let selectedBasename = null;
+let extractedTextRaw = ''; // for search feature
 
 function fetchDocuments(selectFirst = false) {
     fetch('/api/documents')
@@ -98,12 +105,58 @@ function fetchDocuments(selectFirst = false) {
         });
 }
 
+function escapeHtml(text) {
+    return text.replace(/[&<>"']/g, function(m) {
+        switch(m) {
+            case '&': return '&amp;';
+            case '<': return '&lt;';
+            case '>': return '&gt;';
+            case '"': return '&quot;';
+            case "'": return '&#39;';
+        }
+    });
+}
+
+function highlightText(text, term) {
+    if (!term) return escapeHtml(text);
+    let escTerm = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    let regex = new RegExp(escTerm, 'gi');
+    let matches = 0;
+    let html = escapeHtml(text).replace(regex, function(match) {
+        matches++;
+        return `<span class="highlight">${match}</span>`;
+    });
+    return {html, matches};
+}
+
+function updateOcrTextHighlight() {
+    const term = document.getElementById('search-text').value.trim();
+    const ocrTextDiv = document.getElementById('ocr-text');
+    const searchCount = document.getElementById('search-count');
+    if (!extractedTextRaw) {
+        ocrTextDiv.innerHTML = '[No extracted text found.]';
+        searchCount.style.display = "none";
+        return;
+    }
+    if (!term) {
+        ocrTextDiv.innerHTML = escapeHtml(extractedTextRaw);
+        searchCount.style.display = "none";
+        return;
+    }
+    let {html, matches} = highlightText(extractedTextRaw, term);
+    ocrTextDiv.innerHTML = html;
+    searchCount.textContent = matches + " match" + (matches === 1 ? "" : "es");
+    searchCount.style.display = "";
+}
+
 function loadDocumentDetail(filename, basename) {
     selectedFilename = filename;
     selectedBasename = basename;
     document.getElementById('selected-filename').textContent = filename;
     const doc = docListCache.find(d => d.filename === filename);
-    document.getElementById('ocr-text').textContent = doc && doc.extracted_text ? doc.extracted_text : '[No extracted text found.]';
+    extractedTextRaw = doc && doc.extracted_text ? doc.extracted_text : '';
+    document.getElementById('search-text').value = "";
+    updateOcrTextHighlight();
     let flagBtn = document.getElementById('flag-btn');
     let flaggedLabel = document.getElementById('flagged-label');
     flagBtn.style.display = '';
@@ -115,7 +168,6 @@ function loadDocumentDetail(filename, basename) {
         flaggedLabel.style.display = 'none';
     }
 
-    // PDF display logic
     let pdfViewer = document.getElementById('pdf-viewer');
     let pdfMissing = document.getElementById('pdf-missing');
     let pdfPlaceholder = document.getElementById('pdf-placeholder');
@@ -124,23 +176,19 @@ function loadDocumentDetail(filename, basename) {
     pdfPlaceholder.style.display = "none";
 
     if (filename && filename.toLowerCase().endsWith('.pdf')) {
-        console.log('Attempting to fetch PDF:', basename);
         fetch('/api/document/' + encodeURIComponent(basename) + '/pdf', {method: 'HEAD'}).then(resp => {
             if (resp.ok) {
-                console.log('PDF found, displaying in iframe.');
                 pdfViewer.style.display = '';
                 pdfMissing.style.display = 'none';
                 pdfPlaceholder.style.display = 'none';
                 pdfViewer.src = '/api/document/' + encodeURIComponent(basename) + '/pdf#toolbar=0&navpanes=0';
             } else {
-                console.warn('PDF not found on server (HEAD check failed):', basename);
                 pdfViewer.style.display = 'none';
                 pdfMissing.style.display = '';
                 pdfPlaceholder.style.display = 'none';
                 pdfViewer.src = '';
             }
         }).catch(e => {
-            console.error('Error fetching PDF:', e);
             pdfViewer.style.display = 'none';
             pdfMissing.style.display = '';
             pdfPlaceholder.style.display = 'none';
@@ -151,9 +199,14 @@ function loadDocumentDetail(filename, basename) {
         pdfMissing.style.display = 'none';
         pdfPlaceholder.style.display = '';
         pdfViewer.src = '';
-        console.log('Selected file is not a PDF:', filename);
     }
 }
+
+document.getElementById('search-text').addEventListener('input', updateOcrTextHighlight);
+document.getElementById('clear-search').addEventListener('click', function() {
+    document.getElementById('search-text').value = "";
+    updateOcrTextHighlight();
+});
 
 document.getElementById('flag-btn').onclick = function() {
     if (!selectedBasename) return;
