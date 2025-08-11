@@ -124,16 +124,16 @@ function loadDocumentDetail(filename, basename) {
     pdfPlaceholder.style.display = "none";
 
     if (filename && filename.toLowerCase().endsWith('.pdf')) {
-        console.log('Attempting to fetch PDF:', filename);
-        fetch('/pdf/' + encodeURIComponent(filename), {method: 'HEAD'}).then(resp => {
+        console.log('Attempting to fetch PDF:', basename);
+        fetch('/api/document/' + encodeURIComponent(basename) + '/pdf', {method: 'HEAD'}).then(resp => {
             if (resp.ok) {
                 console.log('PDF found, displaying in iframe.');
                 pdfViewer.style.display = '';
                 pdfMissing.style.display = 'none';
                 pdfPlaceholder.style.display = 'none';
-                pdfViewer.src = '/pdf/' + encodeURIComponent(filename) + '#toolbar=0&navpanes=0';
+                pdfViewer.src = '/api/document/' + encodeURIComponent(basename) + '/pdf#toolbar=0&navpanes=0';
             } else {
-                console.warn('PDF not found on server (HEAD check failed):', filename);
+                console.warn('PDF not found on server (HEAD check failed):', basename);
                 pdfViewer.style.display = 'none';
                 pdfMissing.style.display = '';
                 pdfPlaceholder.style.display = 'none';
