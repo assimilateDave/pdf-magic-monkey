@@ -24,7 +24,9 @@
             z-index: 10;
         }
         #ocr-text { white-space: pre-wrap; background: #f9f9f9; border: 1px solid #eee; padding: 8px; min-height: 120px; }
-        #pdf-viewer { width: 100%; height: 60vh; min-height: 200px; border: 1px solid #ccc; background: #fff; }
+        #pdf-viewer { width: 100%; height: 60vh; min-height: 200px; border: 2px solid #007bff; background: #fff; display: block; }
+        #pdf-container { min-height: 220px; }
+        #pdf-missing { color: #c00; font-weight: bold; }
         #doc-list { max-height: 60vh; overflow-y: auto; }
         .doc-entry { cursor: pointer; }
         .doc-entry.selected { background: #e6f7ff; }
@@ -53,8 +55,10 @@
                 <div id="bottom-panel">
                     <strong>Original PDF:</strong>
                     <div id="pdf-container">
-                        <iframe id="pdf-viewer" src="" style="display:none;" frameborder="0"></iframe>
-                        <div id="pdf-missing" style="display:none; color: #999;">[No PDF available]</div>
+                        <!-- Always render iframe and missing message divs -->
+                        <iframe id="pdf-viewer" src="" frameborder="0"></iframe>
+                        <div id="pdf-missing" style="display:none;">[No PDF available]</div>
+                        <div id="pdf-placeholder" style="color:#888;">Select a PDF document to view.</div>
                     </div>
                 </div>
             </div>
@@ -111,25 +115,43 @@ function loadDocumentDetail(filename, basename) {
         flaggedLabel.style.display = 'none';
     }
 
-    // PDF display
+    // PDF display logic
     let pdfViewer = document.getElementById('pdf-viewer');
     let pdfMissing = document.getElementById('pdf-missing');
+    let pdfPlaceholder = document.getElementById('pdf-placeholder');
+    pdfViewer.style.display = "none";
+    pdfMissing.style.display = "none";
+    pdfPlaceholder.style.display = "none";
+
     if (filename && filename.toLowerCase().endsWith('.pdf')) {
+        console.log('Attempting to fetch PDF:', filename);
         fetch('/pdf/' + encodeURIComponent(filename), {method: 'HEAD'}).then(resp => {
             if (resp.ok) {
+                console.log('PDF found, displaying in iframe.');
                 pdfViewer.style.display = '';
                 pdfMissing.style.display = 'none';
+                pdfPlaceholder.style.display = 'none';
                 pdfViewer.src = '/pdf/' + encodeURIComponent(filename) + '#toolbar=0&navpanes=0';
             } else {
+                console.warn('PDF not found on server (HEAD check failed):', filename);
                 pdfViewer.style.display = 'none';
                 pdfMissing.style.display = '';
+                pdfPlaceholder.style.display = 'none';
                 pdfViewer.src = '';
             }
+        }).catch(e => {
+            console.error('Error fetching PDF:', e);
+            pdfViewer.style.display = 'none';
+            pdfMissing.style.display = '';
+            pdfPlaceholder.style.display = 'none';
+            pdfViewer.src = '';
         });
     } else {
         pdfViewer.style.display = 'none';
-        pdfMissing.style.display = '';
+        pdfMissing.style.display = 'none';
+        pdfPlaceholder.style.display = '';
         pdfViewer.src = '';
+        console.log('Selected file is not a PDF:', filename);
     }
 }
 
