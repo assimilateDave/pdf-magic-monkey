@@ -24,6 +24,9 @@
             z-index: 10;
         }
         #ocr-text { white-space: pre-wrap; background: #f9f9f9; border: 1px solid #eee; padding: 8px; min-height: 120px; }
+        .search-highlight { background-color: #ffff99; font-weight: bold; }
+        .search-controls { margin-bottom: 10px; }
+        .search-stats { font-size: 0.9em; color: #666; margin-left: 10px; }
         #pdf-viewer { width: 100%; height: 60vh; min-height: 200px; border: 2px solid #007bff; background: #fff; display: block; }
         #pdf-container { min-height: 220px; }
         #pdf-missing { color: #c00; font-weight: bold; }
@@ -45,6 +48,15 @@
                 <div id="top-panel">
                     <h5 id="selected-filename">(Select a document)</h5>
                     <strong>Extracted Text:</strong>
+                    <div class="search-controls">
+                        <div class="input-group input-group-sm">
+                            <input type="text" id="search-input" class="form-control" placeholder="Search in extracted text..." style="max-width: 300px;">
+                            <button class="btn btn-outline-secondary" type="button" id="clear-search" title="Clear search">
+                                <span>&times;</span>
+                            </button>
+                        </div>
+                        <span id="search-stats" class="search-stats"></span>
+                    </div>
                     <div id="ocr-text">(none)</div>
                     <div class="my-3">
                         <button id="flag-btn" class="btn btn-warning" style="display:none;">Flag for Reprocessing</button>
@@ -69,6 +81,7 @@
 let docListCache = [];
 let selectedFilename = null;
 let selectedBasename = null;
+let originalTextContent = null;
 
 function fetchDocuments(selectFirst = false) {
     fetch('/api/documents')
@@ -103,7 +116,12 @@ function loadDocumentDetail(filename, basename) {
     selectedBasename = basename;
     document.getElementById('selected-filename').textContent = filename;
     const doc = docListCache.find(d => d.filename === filename);
-    document.getElementById('ocr-text').textContent = doc && doc.extracted_text ? doc.extracted_text : '[No extracted text found.]';
+    const extractedText = doc && doc.extracted_text ? doc.extracted_text : '[No extracted text found.]';
+    originalTextContent = extractedText;
+    document.getElementById('ocr-text').textContent = extractedText;
+    
+    // Clear any existing search
+    clearSearch();
     let flagBtn = document.getElementById('flag-btn');
     let flaggedLabel = document.getElementById('flagged-label');
     flagBtn.style.display = '';
@@ -194,6 +212,67 @@ document.addEventListener('mouseup', function(e) {
         document.body.style.cursor = '';
     }
 });
+
+// Search functionality
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function performSearch() {
+    const searchInput = document.getElementById('search-input');
+    const searchTerm = searchInput.value.trim();
+    const ocrTextDiv = document.getElementById('ocr-text');
+    const searchStats = document.getElementById('search-stats');
+    
+    if (!originalTextContent || !searchTerm) {
+        // No search term or no text to search
+        ocrTextDiv.textContent = originalTextContent || '(none)';
+        searchStats.textContent = '';
+        return;
+    }
+    
+    // Create case-insensitive regex for search term
+    const escapedSearchTerm = searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(escapedSearchTerm, 'gi');
+    
+    // Find all matches
+    const matches = originalTextContent.match(regex);
+    const matchCount = matches ? matches.length : 0;
+    
+    if (matchCount === 0) {
+        ocrTextDiv.textContent = originalTextContent;
+        searchStats.textContent = 'No matches found';
+        return;
+    }
+    
+    // Escape the original text for safe HTML insertion
+    const escapedText = escapeHtml(originalTextContent);
+    
+    // Highlight matches in the escaped text
+    const highlightedText = escapedText.replace(regex, '<span class="search-highlight">$&</span>');
+    
+    // Update the content with highlighted matches
+    ocrTextDiv.innerHTML = highlightedText;
+    
+    // Update match count
+    searchStats.textContent = `${matchCount} match${matchCount !== 1 ? 'es' : ''} found`;
+}
+
+function clearSearch() {
+    const searchInput = document.getElementById('search-input');
+    const ocrTextDiv = document.getElementById('ocr-text');
+    const searchStats = document.getElementById('search-stats');
+    
+    searchInput.value = '';
+    ocrTextDiv.textContent = originalTextContent || '(none)';
+    searchStats.textContent = '';
+}
+
+// Event listeners for search functionality
+document.getElementById('search-input').addEventListener('input', performSearch);
+document.getElementById('clear-search').addEventListener('click', clearSearch);
 </script>
 </body>
 </html>
