@@ -5,107 +5,56 @@
     <title>Document OCR Review</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
     <style>
-        #doc-list { max-height: 90vh; overflow-y: auto; }
+        html, body { height: 100%; margin: 0; }
+        .container-fluid, .row, #main-vert { height: 90vh; }
+        #main-vert {
+            display: flex;
+            flex-direction: column;
+            height: 80vh;
+            min-height: 400px;
+        }
+        #top-panel, #bottom-panel { min-height: 100px; }
+        #top-panel { height: 50%; overflow-y: auto; padding: 10px; }
+        #bottom-panel { height: 50%; overflow-y: auto; padding: 10px; border-top: 1px solid #ddd; }
+        #h-resizer {
+            height: 8px;
+            background: #bbb;
+            cursor: row-resize;
+            width: 100%;
+            z-index: 10;
+        }
+        #ocr-text { white-space: pre-wrap; background: #f9f9f9; border: 1px solid #eee; padding: 8px; min-height: 120px; }
+        #pdf-viewer { width: 100%; height: 60vh; min-height: 200px; border: 1px solid #ccc; background: #fff; }
+        #doc-list { max-height: 60vh; overflow-y: auto; }
         .doc-entry { cursor: pointer; }
         .doc-entry.selected { background: #e6f7ff; }
-        #ocr-text { white-space: pre-wrap; }
-        
-        /* Split layout styles */
-        .split-container {
-            display: flex;
-            height: 80vh;
-            border: 1px solid #ddd;
-            overflow: hidden;
-        }
-        
-        .split-left {
-            flex: 0 0 50%;
-            padding: 15px;
-            overflow-y: auto;
-            background-color: #f8f9fa;
-        }
-        
-        .split-right {
-            flex: 1;
-            padding: 15px;
-            overflow-y: auto;
-            background-color: #ffffff;
-        }
-        
-        .divider {
-            width: 5px;
-            background-color: #dee2e6;
-            cursor: col-resize;
-            position: relative;
-            flex-shrink: 0;
-        }
-        
-        .divider:hover {
-            background-color: #6c757d;
-        }
-        
-        .divider::after {
-            content: '';
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 2px;
-            height: 30px;
-            background-color: #6c757d;
-        }
-        
-        #pdf-container {
-            width: 100%;
-            height: 600px;
-            border: 1px solid #ddd;
-            margin-top: 10px;
-        }
-        
-        #pdf-frame {
-            width: 100%;
-            height: 100%;
-            border: none;
-        }
-        
-        .pdf-placeholder {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            height: 100%;
-            background-color: #f8f9fa;
-            color: #6c757d;
-            font-style: italic;
-        }
     </style>
 </head>
 <body>
 <div class="container-fluid">
-    <h2 class="mt-3 mb-4">Document OCR Validation</h2>
+    <h2 class="mt-3 mb-3">Document OCR Validation</h2>
     <div class="row">
         <div class="col-md-3">
             <h5>Processed Documents</h5>
             <ul id="doc-list" class="list-group"></ul>
         </div>
         <div class="col-md-9">
-            <div id="doc-details" class="mb-4">
-                <h5 id="selected-filename">(Select a document)</h5>
-                <div class="split-container">
-                    <div class="split-left">
-                        <strong>Extracted Text:</strong>
-                        <div id="ocr-text" class="border p-2 bg-light mt-2" style="min-height:400px;">(none)</div>
-                        <div class="my-3">
-                            <button id="flag-btn" class="btn btn-warning" style="display:none;">Flag for Reprocessing</button>
-                            <span id="flagged-label" class="badge bg-danger" style="display:none;">Flagged for Reprocessing</span>
-                        </div>
+            <div id="main-vert">
+                <div id="top-panel">
+                    <h5 id="selected-filename">(Select a document)</h5>
+                    <strong>Extracted Text:</strong>
+                    <div id="ocr-text">(none)</div>
+                    <div class="my-3">
+                        <button id="flag-btn" class="btn btn-warning" style="display:none;">Flag for Reprocessing</button>
+                        <span id="flagged-label" class="badge bg-danger" style="display:none;">Flagged for Reprocessing</span>
                     </div>
-                    <div class="divider" id="divider"></div>
-                    <div class="split-right">
-                        <strong>PDF Preview:</strong>
-                        <div id="pdf-container">
-                            <iframe id="pdf-viewer" src="" style="display:none;" frameborder="0"></iframe>    
-                            <div id="pdf-missing" style="display:none; color: #999;">[No PDF available]</div>
-                            </div>
+                </div>
+                <div id="h-resizer"></div>
+                <div id="bottom-panel">
+                    <strong>Original PDF:</strong>
+                    <div id="pdf-container">
+                        <iframe id="pdf-viewer" src="" style="display:none;" frameborder="0"></iframe>
+                        <div id="pdf-missing" style="display:none; color: #999;">[No PDF available]</div>
                     </div>
                 </div>
             </div>
@@ -115,36 +64,7 @@
 <script>
 let docListCache = [];
 let selectedFilename = null;
-let isResizing = false;
-
-// Resizing functionality
-document.getElementById('divider').addEventListener('mousedown', function(e) {
-    isResizing = true;
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-    e.preventDefault();
-});
-
-function handleMouseMove(e) {
-    if (!isResizing) return;
-    
-    const container = document.querySelector('.split-container');
-    const rect = container.getBoundingClientRect();
-    const offsetX = e.clientX - rect.left;
-    const percentage = (offsetX / rect.width) * 100;
-    
-    // Constrain between 20% and 80%
-    const constrainedPercentage = Math.max(20, Math.min(80, percentage));
-    
-    const leftPane = document.querySelector('.split-left');
-    leftPane.style.flex = `0 0 ${constrainedPercentage}%`;
-}
-
-function handleMouseUp() {
-    isResizing = false;
-    document.removeEventListener('mousemove', handleMouseMove);
-    document.removeEventListener('mouseup', handleMouseUp);
-}
+let selectedBasename = null;
 
 function fetchDocuments(selectFirst = false) {
     fetch('/api/documents')
@@ -154,16 +74,17 @@ function fetchDocuments(selectFirst = false) {
             let docList = document.getElementById('doc-list');
             docList.innerHTML = '';
             for (let i = 0; i < docs.length; i++) {
-                let doc = docs[i]; // ensure block scope
+                let doc = docs[i];
                 let li = document.createElement('li');
                 li.className = 'list-group-item doc-entry';
                 if (doc.flagged) li.classList.add('list-group-item-danger');
                 li.textContent = doc.filename + (doc.flagged ? " (FLAGGED)" : "");
                 li.dataset.filename = doc.filename;
+                li.dataset.basename = doc.basename;
                 li.onclick = function() {
                     document.querySelectorAll('.doc-entry').forEach(e => e.classList.remove('selected'));
                     this.classList.add('selected');
-                    loadDocumentDetail(doc.filename);
+                    loadDocumentDetail(doc.filename, doc.basename);
                 };
                 docList.appendChild(li);
             }
@@ -173,15 +94,12 @@ function fetchDocuments(selectFirst = false) {
         });
 }
 
-function loadDocumentDetail(filename) {
+function loadDocumentDetail(filename, basename) {
     selectedFilename = filename;
+    selectedBasename = basename;
     document.getElementById('selected-filename').textContent = filename;
     const doc = docListCache.find(d => d.filename === filename);
     document.getElementById('ocr-text').textContent = doc && doc.extracted_text ? doc.extracted_text : '[No extracted text found.]';
-    
-    // Load PDF
-    loadPDF(filename);
-    
     let flagBtn = document.getElementById('flag-btn');
     let flaggedLabel = document.getElementById('flagged-label');
     flagBtn.style.display = '';
@@ -192,31 +110,68 @@ function loadDocumentDetail(filename) {
         flagBtn.textContent = 'Flag for Reprocessing';
         flaggedLabel.style.display = 'none';
     }
-}
 
-function loadPDF(filename) {
-    const pdfContainer = document.getElementById('pdf-container');
-    const pdfUrl = '/api/document/' + encodeURIComponent(filename) + '/pdf';
-    
-    // Create iframe for PDF
-    pdfContainer.innerHTML = `<iframe id="pdf-frame" src="${pdfUrl}" type="application/pdf">
-        <div class="pdf-placeholder">PDF cannot be displayed. <a href="${pdfUrl}" target="_blank">Download PDF</a></div>
-    </iframe>`;
+    // PDF display
+    let pdfViewer = document.getElementById('pdf-viewer');
+    let pdfMissing = document.getElementById('pdf-missing');
+    if (filename && filename.toLowerCase().endsWith('.pdf')) {
+        fetch('/pdf/' + encodeURIComponent(filename), {method: 'HEAD'}).then(resp => {
+            if (resp.ok) {
+                pdfViewer.style.display = '';
+                pdfMissing.style.display = 'none';
+                pdfViewer.src = '/pdf/' + encodeURIComponent(filename) + '#toolbar=0&navpanes=0';
+            } else {
+                pdfViewer.style.display = 'none';
+                pdfMissing.style.display = '';
+                pdfViewer.src = '';
+            }
+        });
+    } else {
+        pdfViewer.style.display = 'none';
+        pdfMissing.style.display = '';
+        pdfViewer.src = '';
+    }
 }
 
 document.getElementById('flag-btn').onclick = function() {
-    if (!selectedFilename) return;
-    let isFlag = this.textContent === 'Flag for Reprocessing';
-    fetch('/api/document/' + encodeURIComponent(selectedFilename) + '/flag', {
+    if (!selectedBasename) return;
+    const doc = docListCache.find(d => d.basename === selectedBasename);
+    const newFlag = !(doc && doc.flagged);
+    fetch('/api/document/' + encodeURIComponent(selectedBasename) + '/flag', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ flag: isFlag })
-    }).then(() => {
-        fetchDocuments(selectedFilename);
-    });
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({flag: newFlag})
+    }).then(() => fetchDocuments(false));
 };
 
-fetchDocuments();
+fetchDocuments(true);
+
+// Resizable top/bottom panels logic
+const hResizer = document.getElementById('h-resizer');
+const topPanel = document.getElementById('top-panel');
+const bottomPanel = document.getElementById('bottom-panel');
+let isVertResizing = false;
+hResizer.addEventListener('mousedown', function(e) {
+    isVertResizing = true;
+    document.body.style.cursor = 'row-resize';
+});
+document.addEventListener('mousemove', function(e) {
+    if (!isVertResizing) return;
+    const container = document.getElementById('main-vert');
+    const rect = container.getBoundingClientRect();
+    let offset = e.clientY - rect.top;
+    let min = 100, max = rect.height - 100;
+    if (offset < min) offset = min;
+    if (offset > max) offset = max;
+    topPanel.style.height = (offset / rect.height * 100) + '%';
+    bottomPanel.style.height = ((rect.height - offset) / rect.height * 100) + '%';
+});
+document.addEventListener('mouseup', function(e) {
+    if (isVertResizing) {
+        isVertResizing = false;
+        document.body.style.cursor = '';
+    }
+});
 </script>
 </body>
 </html>
