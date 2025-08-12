@@ -22,3 +22,8 @@ Thumbs.db
 # Virtual environment
 venv/
 env/
+
+# Debug images (auto-generated during OCR preprocessing)
+debug_imgs/
+*/debug_imgs/
+C:\PDF-Processing/debug_imgs/
