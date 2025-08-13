@@ -2,8 +2,8 @@ import os
 import sqlite3
 from flask import Flask, render_template, jsonify, request, send_file, abort
 
-DB_PATH = "documents.db"
-FINAL_DIR = os.path.abspath(r"C:\PDF-Processing\PDF_final")  # Final storage for processed documents
+DB_PATH = os.environ.get('DB_PATH', "documents.db")
+FINAL_DIR = os.path.abspath(os.environ.get('FINAL_DIR', r"C:\PDF-Processing\PDF_final"))  # Final storage for processed documents
 
 def get_db_connection():
     conn = sqlite3.connect(DB_PATH)
@@ -104,5 +104,6 @@ def api_document_pdf(basename):
         abort(500, description=f"Error serving PDF: {str(e)}")
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    # Bind to all interfaces for Docker compatibility
+    app.run(host='0.0.0.0', port=5000, debug=True)
     

@@ -5,12 +5,16 @@ import shutil
 from pdf2image import convert_from_path
 from PIL import Image, ImageFilter, ImageEnhance
 import pytesseract
-pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
-# Define your working directories here
-WATCH_DIR = os.path.abspath(r"C:\PDF-Processing\PDF_IN")    # Input folder for new documents
-WORK_DIR = os.path.abspath(r"C:\PDF-Processing\PDF_working")  # Temporary processing folder
-FINAL_DIR = os.path.abspath(r"C:\PDF-Processing\PDF_final")   # Final storage for processed documents
+# Configure tesseract command (use system default if not specified)
+tesseract_cmd = os.environ.get('TESSERACT_CMD', r"C:\Program Files\Tesseract-OCR\tesseract.exe")
+if tesseract_cmd != 'tesseract':  # Don't set if using system default
+    pytesseract.pytesseract.tesseract_cmd = tesseract_cmd
+
+# Define your working directories here (configurable via environment variables)
+WATCH_DIR = os.path.abspath(os.environ.get('WATCH_DIR', r"C:\PDF-Processing\PDF_IN"))    # Input folder for new documents
+WORK_DIR = os.path.abspath(os.environ.get('WORK_DIR', r"C:\PDF-Processing\PDF_working"))  # Temporary processing folder
+FINAL_DIR = os.path.abspath(os.environ.get('FINAL_DIR', r"C:\PDF-Processing\PDF_final"))   # Final storage for processed documents
 
 def move_to_work_folder(file_path):
     """Move file from the watch folder to the work folder."""
@@ -81,16 +85,18 @@ def extract_text_from_pdf(file_path):
     Saves debug images with original filename as prefix.
     Skips extraction of the top 60px of each page.
     """
-    debug_folder = r"C:\PDF-Processing\debug_imgs"
+    debug_folder = os.path.abspath(os.environ.get('DEBUG_DIR', r"C:\PDF-Processing\debug_imgs"))
     os.makedirs(debug_folder, exist_ok=True)
     base_name = os.path.splitext(os.path.basename(file_path))[0]
     try:
         # Use higher DPI for faxes
-        pages = convert_from_path(
-            file_path, 
-            dpi=400, 
-            poppler_path=r"C:\PDF-Processing\poppler\Library\bin"
-        )
+        poppler_path = os.environ.get('POPPLER_PATH', r"C:\PDF-Processing\poppler\Library\bin")
+        # Only pass poppler_path if it's not the default system path
+        pdf_kwargs = {'dpi': 400}
+        if poppler_path and poppler_path != 'system':
+            pdf_kwargs['poppler_path'] = poppler_path
+        
+        pages = convert_from_path(file_path, **pdf_kwargs)
         text = ""
         for i, page in enumerate(pages):
             # Preprocessing step here:

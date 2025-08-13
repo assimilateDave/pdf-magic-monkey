@@ -4,6 +4,27 @@
 
 This system automatically processes PDF and TIF documents through OCR (Optical Character Recognition), classifies them, and stores the results in a database with a web-based review interface.
 
+## 🐳 Docker Support
+
+PDF Magic Monkey now supports Docker for easy deployment on any Linux system! See [DOCKER.md](DOCKER.md) for complete setup instructions including:
+
+- Building and running containers for both batch processing and web interface
+- Host directory mounting for persistent data
+- Configuration options and troubleshooting
+- Step-by-step Kubuntu installation guide
+
+Quick start with Docker:
+```bash
+# Build the image
+docker build -t pdf-magic-monkey .
+
+# Run web interface
+docker run -d -p 5000:5000 -v ~/pdf-processing:/app/data pdf-magic-monkey web
+
+# Run batch processing
+docker run -d -v ~/pdf-processing:/app/data pdf-magic-monkey batch
+```
+
 ## New Processing Workflow (Updated)
 
 The document processing workflow has been enhanced to use a dedicated final folder for fully processed files:
