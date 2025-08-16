@@ -17,6 +17,7 @@ C:\PDF-Processing\
 ├── PDF_final\       # Final storage for processed documents (auto-created) ⭐ NEW
 └── debug_imgs\      # Debug images from OCR preprocessing (auto-created)
     ├── original\    # Original images before preprocessing ⭐ NEW
+    ├── orientation\ # Before/after orientation correction ⭐ NEW
     ├── basic\       # After basic preprocessing ⭐ NEW
     ├── denoise\     # After noise removal ⭐ NEW
     ├── morph\       # After morphological operations ⭐ NEW
@@ -28,6 +29,7 @@ C:\PDF-Processing\
 1. **File Detection**: Documents placed in `PDF_IN` are automatically detected
 2. **Initial Processing**: Files are moved to `PDF_working` for processing
 3. **Text Extraction**: OCR is performed with enhanced preprocessing pipeline:
+   - **Page Orientation Correction** ⭐ **NEW**: Automatically detects and corrects page rotation (90°, 180°, 270°) using Tesseract OSD
    - **Basic Preprocessing**: Grayscale conversion, adaptive thresholding, median blur, sharpening, contrast enhancement
    - **Noise Removal** ⭐ **NEW**: OpenCV denoising (fastNlMeansDenoising or bilateralFilter)
    - **Morphological Operations** ⭐ **NEW**: Configurable dilation, erosion, opening, closing
@@ -76,6 +78,10 @@ The OCR preprocessing pipeline can be configured using the `ocr_preprocess.yaml`
 #### Configuration Structure
 
 ```yaml
+# Page orientation correction (applied first)
+orientation_correction:
+  enabled: true
+
 # Basic preprocessing (existing functionality)
 basic_preprocessing:
   enabled: true
@@ -120,6 +126,7 @@ debug:
   base_folder: "debug_imgs"
   subfolders:
     original: "original"
+    orientation: "orientation"
     basic: "basic"
     denoise: "denoise"
     morph: "morph"
@@ -128,6 +135,7 @@ debug:
 
 #### Tuning Guidelines
 
+- **Page Orientation Correction**: Set `enabled: false` to disable if your documents are always correctly oriented, or if Tesseract OSD causes issues with your specific document types
 - **Noise Removal**: Increase `h` parameter for more aggressive denoising, decrease for preserving fine details
 - **Morphological Operations**: Use "opening" to remove noise, "closing" to fill gaps. Adjust kernel size based on document characteristics
 - **Line Removal**: Adjust `threshold` and `min_line_length` based on the types of lines you want to remove

@@ -1,6 +1,10 @@
 # OCR Preprocessing Configuration
 # Controls the preprocessing steps applied to images before OCR
 
+# Page orientation correction (applied first)
+orientation_correction:
+  enabled: true
+
 # Basic preprocessing (existing functionality)
 basic_preprocessing:
   enabled: true
@@ -61,6 +65,7 @@ debug:
   base_folder: "debug_imgs"  # Relative to processing directory or absolute path
   subfolders:
     original: "original"
+    orientation: "orientation"
     basic: "basic"
     denoise: "denoise"
     morph: "morph"
