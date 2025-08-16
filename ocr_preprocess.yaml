@@ -1,0 +1,67 @@
+# OCR Preprocessing Configuration
+# Controls the preprocessing steps applied to images before OCR
+
+# Basic preprocessing (existing functionality)
+basic_preprocessing:
+  enabled: true
+  adaptive_threshold:
+    block_size: 15
+    c_value: 11
+  median_blur:
+    kernel_size: 3
+  sharpen:
+    enabled: true
+  contrast_enhancement:
+    factor: 2.0
+
+# Noise removal step (applied after adaptive thresholding)
+noise_removal:
+  enabled: true
+  method: "fastNlMeansDenoising"  # Options: "fastNlMeansDenoising", "bilateralFilter"
+  # Parameters for fastNlMeansDenoising
+  h: 10  # Filter strength. Higher h removes more noise but also removes details
+  templateWindowSize: 7
+  searchWindowSize: 21
+  # Parameters for bilateralFilter (alternative)
+  d: 9  # Diameter of each pixel neighborhood
+  sigmaColor: 75  # Filter sigma in the color space
+  sigmaSpace: 75  # Filter sigma in the coordinate space
+
+# Morphological operations (applied after noise removal)
+morphological_operations:
+  enabled: true
+  operations:
+    - type: "opening"  # Options: "erosion", "dilation", "opening", "closing"
+      kernel_size: [3, 3]  # [width, height]
+      kernel_shape: "ellipse"  # Options: "rectangle", "ellipse", "cross"
+      iterations: 1
+    - type: "closing"
+      kernel_size: [2, 2]
+      kernel_shape: "ellipse"
+      iterations: 1
+
+# Line and border removal (applied after morphological operations)
+line_removal:
+  enabled: true
+  # Hough Line Transform parameters
+  rho: 1  # Distance resolution in pixels
+  theta_degrees: 1  # Angle resolution in degrees (will be converted to radians)
+  threshold: 100  # Minimum number of votes (intersections in Hough grid cell)
+  min_line_length: 50  # Minimum line length. Lines shorter than this are rejected
+  max_line_gap: 10  # Maximum allowed gap between points on the same line
+  # Line removal parameters
+  line_thickness: 3  # Thickness of lines to erase (pixels)
+  horizontal_lines: true  # Remove horizontal lines
+  vertical_lines: true  # Remove vertical lines
+  angle_tolerance: 10  # Tolerance in degrees for considering lines horizontal/vertical
+
+# Debug settings
+debug:
+  save_images: true
+  base_folder: "debug_imgs"  # Relative to processing directory or absolute path
+  subfolders:
+    original: "original"
+    basic: "basic"
+    denoise: "denoise"
+    morph: "morph"
+    lines: "lines"

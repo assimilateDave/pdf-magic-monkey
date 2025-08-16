@@ -16,13 +16,22 @@ C:\PDF-Processing\
 ├── PDF_working\     # Temporary processing folder (auto-created)
 ├── PDF_final\       # Final storage for processed documents (auto-created) ⭐ NEW
 └── debug_imgs\      # Debug images from OCR preprocessing (auto-created)
+    ├── original\    # Original images before preprocessing ⭐ NEW
+    ├── basic\       # After basic preprocessing ⭐ NEW
+    ├── denoise\     # After noise removal ⭐ NEW
+    ├── morph\       # After morphological operations ⭐ NEW
+    └── lines\       # After line removal ⭐ NEW
 ```
 
 ### Processing Steps
 
 1. **File Detection**: Documents placed in `PDF_IN` are automatically detected
 2. **Initial Processing**: Files are moved to `PDF_working` for processing
-3. **Text Extraction**: OCR is performed with preprocessing optimized for fax documents
+3. **Text Extraction**: OCR is performed with enhanced preprocessing pipeline:
+   - **Basic Preprocessing**: Grayscale conversion, adaptive thresholding, median blur, sharpening, contrast enhancement
+   - **Noise Removal** ⭐ **NEW**: OpenCV denoising (fastNlMeansDenoising or bilateralFilter)
+   - **Morphological Operations** ⭐ **NEW**: Configurable dilation, erosion, opening, closing
+   - **Line Removal** ⭐ **NEW**: Hough Line Transform to remove horizontal/vertical lines
 4. **Document Classification**: Content is analyzed to determine document type (Invoice, Receipt, Report, etc.)
 5. **Final Storage**: ⭐ **NEW** - Successfully processed files are moved to `PDF_final`
 6. **Database Storage**: Document metadata and extracted text are stored with the final file path
@@ -60,6 +69,70 @@ CREATE TABLE documents (
 
 ## Configuration
 
+### OCR Preprocessing Configuration ⭐ NEW
+
+The OCR preprocessing pipeline can be configured using the `ocr_preprocess.yaml` file in the project root. This allows you to enable/disable processing steps and tune their parameters for optimal results.
+
+#### Configuration Structure
+
+```yaml
+# Basic preprocessing (existing functionality)
+basic_preprocessing:
+  enabled: true
+  adaptive_threshold:
+    block_size: 15
+    c_value: 11
+  median_blur:
+    kernel_size: 3
+  sharpen:
+    enabled: true
+  contrast_enhancement:
+    factor: 2.0
+
+# Noise removal step
+noise_removal:
+  enabled: true  # Set to false to disable
+  method: "fastNlMeansDenoising"  # or "bilateralFilter"
+  h: 10  # Filter strength for fastNlMeansDenoising
+  # ... additional parameters
+
+# Morphological operations
+morphological_operations:
+  enabled: true
+  operations:
+    - type: "opening"  # "erosion", "dilation", "opening", "closing"
+      kernel_size: [3, 3]
+      kernel_shape: "ellipse"  # "rectangle", "ellipse", "cross"
+      iterations: 1
+
+# Line and border removal
+line_removal:
+  enabled: true
+  threshold: 100  # Hough transform threshold
+  min_line_length: 50
+  horizontal_lines: true
+  vertical_lines: true
+  angle_tolerance: 10  # degrees
+
+# Debug settings
+debug:
+  save_images: true
+  base_folder: "debug_imgs"
+  subfolders:
+    original: "original"
+    basic: "basic"
+    denoise: "denoise"
+    morph: "morph"
+    lines: "lines"
+```
+
+#### Tuning Guidelines
+
+- **Noise Removal**: Increase `h` parameter for more aggressive denoising, decrease for preserving fine details
+- **Morphological Operations**: Use "opening" to remove noise, "closing" to fill gaps. Adjust kernel size based on document characteristics
+- **Line Removal**: Adjust `threshold` and `min_line_length` based on the types of lines you want to remove
+- **Debug Images**: Set `save_images: false` to disable debug image generation for faster processing
+
 ### Directory Paths (in processor.py)
 
 ```python
@@ -81,6 +154,8 @@ FINAL_DIR = os.path.abspath(r"C:\PDF-Processing\PDF_final")   # Final storage �
    ```bash
    pip install -r requirements.txt
    ```
+   
+   **Note**: The enhanced OCR preprocessing requires PyYAML for configuration management. This is now included in requirements.txt.
 
 2. **Start Document Processing**:
    ```bash
