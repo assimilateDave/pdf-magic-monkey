@@ -7,7 +7,13 @@ import math
 from pdf2image import convert_from_path
 from PIL import Image, ImageFilter, ImageEnhance
 import pytesseract
-pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+
+# Set tesseract path based on the operating system
+if os.name == 'nt':  # Windows
+    pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+else:  # Unix/Linux systems
+    # Use the system tesseract (should be in PATH after installation)
+    pytesseract.pytesseract.tesseract_cmd = 'tesseract'
 
 # Define your working directories here
 WATCH_DIR = os.path.abspath(r"C:\PDF-Processing\PDF_IN")    # Input folder for new documents
@@ -31,6 +37,7 @@ def load_config():
 def get_default_config():
     """Return default configuration if config file is not available."""
     return {
+        'orientation_correction': {'enabled': True},
         'basic_preprocessing': {'enabled': True},
         'noise_removal': {'enabled': False},
         'morphological_operations': {'enabled': False},
@@ -40,6 +47,7 @@ def get_default_config():
             'base_folder': 'debug_imgs',
             'subfolders': {
                 'original': 'original',
+                'orientation': 'orientation',
                 'basic': 'basic',
                 'denoise': 'denoise',
                 'morph': 'morph',
@@ -106,6 +114,55 @@ def save_debug_image(img, base_name, page_idx, step_name, subfolder=None):
     
     img.save(debug_path)
     return debug_path
+
+def preprocess_orientation_correction(img, base_name, page_idx):
+    """
+    Apply page orientation correction using Tesseract's OSD (Orientation and Script Detection).
+    
+    Args:
+        img: PIL Image
+        base_name: Base filename for debug images
+        page_idx: Page index
+        
+    Returns:
+        PIL Image after orientation correction
+    """
+    config = CONFIG.get('orientation_correction', {})
+    if not config.get('enabled', True):
+        return img
+    
+    try:
+        # Save original image before orientation correction
+        save_debug_image(img, base_name, page_idx, 'before_orientation',
+                        CONFIG.get('debug', {}).get('subfolders', {}).get('orientation'))
+        
+        # Use Tesseract OSD to detect orientation
+        osd = pytesseract.image_to_osd(img)
+        
+        # Parse the OSD output to extract rotation angle
+        rotation_angle = 0
+        for line in osd.split('\n'):
+            if 'Rotate:' in line:
+                rotation_angle = int(line.split(':')[1].strip())
+                break
+        
+        # Apply rotation correction if needed
+        corrected_img = img
+        if rotation_angle != 0:
+            print(f"Detected {rotation_angle}° rotation, correcting orientation...")
+            # Rotate counter-clockwise to correct the orientation
+            corrected_img = img.rotate(-rotation_angle, expand=True, fillcolor='white')
+        
+        # Save corrected image
+        save_debug_image(corrected_img, base_name, page_idx, 'after_orientation',
+                        CONFIG.get('debug', {}).get('subfolders', {}).get('orientation'))
+        
+        return corrected_img
+        
+    except Exception as e:
+        print(f"Warning: Orientation correction failed for page {page_idx}: {e}")
+        # Return original image if orientation detection fails
+        return img
 
 def preprocess_basic(img, base_name, page_idx):
     """
@@ -355,7 +412,8 @@ def preprocess_fax_page(pil_img, base_name="image", page_idx=0):
         PIL Image after all enabled preprocessing steps
     """
     # Apply preprocessing steps in order
-    img = preprocess_basic(pil_img, base_name, page_idx)
+    img = preprocess_orientation_correction(pil_img, base_name, page_idx)
+    img = preprocess_basic(img, base_name, page_idx)
     img = preprocess_noise_removal(img, base_name, page_idx)
     img = preprocess_morphological_operations(img, base_name, page_idx)
     img = preprocess_line_removal(img, base_name, page_idx)
