@@ -6,6 +6,9 @@ This file shows example configurations for different document types and use case
 
 ```yaml
 # For clean, high-quality documents
+orientation_correction:
+  enabled: true  # Keep enabled for scanned documents
+
 basic_preprocessing:
   enabled: true
   adaptive_threshold:
@@ -31,10 +34,45 @@ debug:
   save_images: false  # Disable to save disk space
 ```
 
+## Configuration for Born-Digital Documents (Disable Orientation Correction)
+
+```yaml
+# For documents that are born-digital (never scanned/rotated)
+orientation_correction:
+  enabled: false  # Disable for born-digital documents
+
+basic_preprocessing:
+  enabled: true
+  adaptive_threshold:
+    block_size: 11
+    c_value: 8
+  median_blur:
+    kernel_size: 1
+  sharpen:
+    enabled: false
+  contrast_enhancement:
+    factor: 1.0  # No enhancement needed
+
+noise_removal:
+  enabled: false
+
+morphological_operations:
+  enabled: false
+
+line_removal:
+  enabled: false
+
+debug:
+  save_images: false
+```
+
 ## Configuration for Noisy Fax Documents (Aggressive Processing)
 
 ```yaml
 # For noisy, low-quality fax documents
+orientation_correction:
+  enabled: true  # Essential for faxes that may be rotated
+
 basic_preprocessing:
   enabled: true
   adaptive_threshold:
@@ -82,6 +120,9 @@ debug:
 
 ```yaml
 # For forms with table borders and lines to remove
+orientation_correction:
+  enabled: true  # Important for scanned forms
+
 basic_preprocessing:
   enabled: true
 
