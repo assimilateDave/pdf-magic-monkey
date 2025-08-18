@@ -15,7 +15,7 @@ app = Flask(__name__)
 def get_all_documents():
     conn = get_db_connection()
     docs = conn.execute(
-        "SELECT id, file_name, basename, extracted_text, flagged_for_reprocessing FROM documents"
+        "SELECT id, file_name, basename, extracted_text, flagged_for_reprocessing, orientation_corrected FROM documents"
     ).fetchall()
     conn.close()
     return [
@@ -25,7 +25,8 @@ def get_all_documents():
             "file_path": doc["file_name"],  # Full path to final location
             "basename": doc["basename"],
             "extracted_text": doc["extracted_text"],
-            "flagged": bool(doc["flagged_for_reprocessing"])
+            "flagged": bool(doc["flagged_for_reprocessing"]),
+            "orientation_corrected": bool(doc["orientation_corrected"] if doc["orientation_corrected"] is not None else False)
         }
         for doc in docs
     ]
