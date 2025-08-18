@@ -57,6 +57,7 @@ CREATE TABLE documents (
     document_type TEXT,                   -- Classified document type
     extracted_text TEXT,                  -- OCR extracted text
     flagged_for_reprocessing INTEGER DEFAULT 0,
+    orientation_corrected INTEGER DEFAULT 0, -- Flag indicating if orientation was corrected
     processed_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 ```
@@ -218,3 +219,23 @@ All directories (`WORK_DIR`, `FINAL_DIR`, debug folders) are automatically creat
 - `POST /api/document/<basename>/flag` - Flag/unflag a document for reprocessing
 
 The API now returns both the display filename (basename) and the full file path for complete file management.
+
+## Orientation Correction Tracking ⭐ NEW
+
+The system now automatically tracks when document orientation correction is applied during processing:
+
+### Features
+
+- **Database Storage**: The `orientation_corrected` field in the database indicates if a document's orientation was corrected (1) or not (0)
+- **Automatic Detection**: During OCR preprocessing, Tesseract's OSD (Orientation and Script Detection) detects incorrect orientation
+- **Visual Indicators**: The web interface displays a blue "📐 ROTATED" badge next to documents that had their orientation corrected
+- **API Integration**: The `/api/documents` endpoint includes the `orientation_corrected` field in responses
+
+### How It Works
+
+1. **Processing**: When a document is processed, each page is analyzed for correct orientation
+2. **Correction**: If rotation is needed, the image is rotated and the correction is tracked
+3. **Storage**: The orientation correction status is stored in the database along with other document metadata  
+4. **Display**: Users can see which documents required orientation correction in the web interface
+
+This ensures users know if the PDF they see has been automatically rotated for correct orientation, providing transparency about the processing steps applied.

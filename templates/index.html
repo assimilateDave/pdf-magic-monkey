@@ -89,7 +89,18 @@ function fetchDocuments(selectFirst = false) {
                 let li = document.createElement('li');
                 li.className = 'list-group-item doc-entry';
                 if (doc.flagged) li.classList.add('list-group-item-danger');
-                li.textContent = doc.filename + (doc.flagged ? " (FLAGGED)" : "");
+                
+                // Build the display text with indicators
+                let displayText = doc.filename;
+                let badges = '';
+                if (doc.flagged) {
+                    badges += ' <span class="badge bg-warning text-dark">FLAGGED</span>';
+                }
+                if (doc.orientation_corrected) {
+                    badges += ' <span class="badge bg-info text-white" title="Document orientation was corrected during processing">📐 ROTATED</span>';
+                }
+                
+                li.innerHTML = displayText + badges;
                 li.dataset.filename = doc.filename;
                 li.dataset.basename = doc.basename;
                 li.onclick = function() {

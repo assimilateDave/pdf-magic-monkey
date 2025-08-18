@@ -125,11 +125,11 @@ def preprocess_orientation_correction(img, base_name, page_idx):
         page_idx: Page index
         
     Returns:
-        PIL Image after orientation correction
+        tuple: (PIL Image after orientation correction, bool indicating if correction was applied)
     """
     config = CONFIG.get('orientation_correction', {})
     if not config.get('enabled', True):
-        return img
+        return img, False
     
     try:
         # Save original image before orientation correction
@@ -148,21 +148,23 @@ def preprocess_orientation_correction(img, base_name, page_idx):
         
         # Apply rotation correction if needed
         corrected_img = img
+        orientation_was_corrected = False
         if rotation_angle != 0:
             print(f"Detected {rotation_angle}° rotation, correcting orientation...")
             # Rotate counter-clockwise to correct the orientation
             corrected_img = img.rotate(-rotation_angle, expand=True, fillcolor='white')
+            orientation_was_corrected = True
         
         # Save corrected image
         save_debug_image(corrected_img, base_name, page_idx, 'after_orientation',
                         CONFIG.get('debug', {}).get('subfolders', {}).get('orientation'))
         
-        return corrected_img
+        return corrected_img, orientation_was_corrected
         
     except Exception as e:
         print(f"Warning: Orientation correction failed for page {page_idx}: {e}")
         # Return original image if orientation detection fails
-        return img
+        return img, False
 
 def preprocess_basic(img, base_name, page_idx):
     """
@@ -409,22 +411,25 @@ def preprocess_fax_page(pil_img, base_name="image", page_idx=0):
         page_idx: Page index for debug images
         
     Returns:
-        PIL Image after all enabled preprocessing steps
+        tuple: (PIL Image after all enabled preprocessing steps, bool indicating if orientation was corrected)
     """
     # Apply preprocessing steps in order
-    img = preprocess_orientation_correction(pil_img, base_name, page_idx)
+    img, orientation_corrected = preprocess_orientation_correction(pil_img, base_name, page_idx)
     img = preprocess_basic(img, base_name, page_idx)
     img = preprocess_noise_removal(img, base_name, page_idx)
     img = preprocess_morphological_operations(img, base_name, page_idx)
     img = preprocess_line_removal(img, base_name, page_idx)
     
-    return img
+    return img, orientation_corrected
 
 def extract_text_from_pdf(file_path):
     """
     Extract text from a PDF, using preprocessing optimized for faxed documents.
     Saves debug images with original filename as prefix.
     Skips extraction of the top 60px of each page.
+    
+    Returns:
+        tuple: (extracted_text, bool indicating if any page had orientation corrected)
     """
     debug_folder = r"C:\PDF-Processing\debug_imgs"
     os.makedirs(debug_folder, exist_ok=True)
@@ -437,9 +442,14 @@ def extract_text_from_pdf(file_path):
             poppler_path=r"C:\PDF-Processing\poppler\Library\bin"
         )
         text = ""
+        any_page_orientation_corrected = False
         for i, page in enumerate(pages):
             # Preprocessing step here with base_name and page index:
-            proc_page = preprocess_fax_page(page, base_name, i)
+            proc_page, page_orientation_corrected = preprocess_fax_page(page, base_name, i)
+            
+            # Track if any page had orientation correction
+            if page_orientation_corrected:
+                any_page_orientation_corrected = True
             
             # Save final processed image for backward compatibility
             debug_path = os.path.join(
@@ -452,28 +462,31 @@ def extract_text_from_pdf(file_path):
             cropped_page = proc_page.crop((0, 60, width, height))
             config = '--oem 1 --psm 3'
             text += pytesseract.image_to_string(cropped_page, config=config, lang='eng')
-        return text
+        return text, any_page_orientation_corrected
     except Exception as e:
         print(f"Error processing PDF: {e}")
-        return ""
+        return "", False
 
 def extract_text_from_tif(file_path):
     """
     Use OCR to extract text from a TIF, skipping the top 60px.
+    
+    Returns:
+        tuple: (extracted_text, bool indicating if orientation was corrected)
     """
     base_name = os.path.splitext(os.path.basename(file_path))[0]
     try:
         img = Image.open(file_path)
-        proc_img = preprocess_fax_page(img, base_name, 0)
+        proc_img, orientation_corrected = preprocess_fax_page(img, base_name, 0)
         # Crop top 60px
         width, height = proc_img.size
         cropped_img = proc_img.crop((0, 60, width, height))
         config = '--oem 1 --psm 6'
         text = pytesseract.image_to_string(cropped_img, config=config, lang='eng')
-        return text
+        return text, orientation_corrected
     except Exception as e:
         print(f"Error processing TIF: {e}")
-        return ""
+        return "", False
 
 def process_document(file_path):
     """
@@ -485,14 +498,19 @@ def process_document(file_path):
     2. Extract text and classify the document
     3. Move file from WORK_DIR to FINAL_DIR after successful processing
     4. Return final file path (not just basename) for database storage
+    
+    Returns:
+        tuple: (final_file_path, document_type, extracted_text, orientation_corrected)
     """
     print("PROCESS_DOCUMENT CALLED")
     work_file = move_to_work_folder(file_path)
     extracted_text = ""
+    orientation_corrected = False
+    
     if work_file.lower().endswith(".pdf"):
-        extracted_text = extract_text_from_pdf(work_file)
+        extracted_text, orientation_corrected = extract_text_from_pdf(work_file)
     elif work_file.lower().endswith((".tif", ".tiff")):
-        extracted_text = extract_text_from_tif(work_file)
+        extracted_text, orientation_corrected = extract_text_from_tif(work_file)
     else:
         print("Unsupported file format")
     
@@ -501,4 +519,4 @@ def process_document(file_path):
     # Move to final folder after successful processing
     final_file = move_to_final_folder(work_file)
     
-    return final_file, document_type, extracted_text
+    return final_file, document_type, extracted_text, orientation_corrected
