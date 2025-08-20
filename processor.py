@@ -4,6 +4,7 @@ import numpy as np
 import shutil
 import yaml
 import math
+import tempfile
 from pdf2image import convert_from_path
 from PIL import Image, ImageFilter, ImageEnhance
 import pytesseract
@@ -15,10 +16,16 @@ else:  # Unix/Linux systems
     # Use the system tesseract (should be in PATH after installation)
     pytesseract.pytesseract.tesseract_cmd = 'tesseract'
 
-# Define your working directories here
-WATCH_DIR = os.path.abspath(r"C:\PDF-Processing\PDF_IN")    # Input folder for new documents
-WORK_DIR = os.path.abspath(r"C:\PDF-Processing\PDF_working")  # Temporary processing folder
-FINAL_DIR = os.path.abspath(r"C:\PDF-Processing\PDF_final")   # Final storage for processed documents
+# Define your working directories here  
+if os.name == 'nt':  # Windows
+    WATCH_DIR = os.path.abspath(r"C:\PDF-Processing\PDF_IN")    # Input folder for new documents
+    WORK_DIR = os.path.abspath(r"C:\PDF-Processing\PDF_working")  # Temporary processing folder
+    FINAL_DIR = os.path.abspath(r"C:\PDF-Processing\PDF_final")   # Final storage for processed documents
+else:  # Unix/Linux systems
+    base_dir = os.path.abspath("PDF-Processing")
+    WATCH_DIR = os.path.join(base_dir, "PDF_IN")    # Input folder for new documents
+    WORK_DIR = os.path.join(base_dir, "PDF_working")  # Temporary processing folder
+    FINAL_DIR = os.path.join(base_dir, "PDF_final")   # Final storage for processed documents
 
 # Load OCR preprocessing configuration
 def load_config():
@@ -94,7 +101,7 @@ def save_debug_image(img, base_name, page_idx, step_name, subfolder=None):
     
     debug_base = CONFIG.get('debug', {}).get('base_folder', 'debug_imgs')
     if not os.path.isabs(debug_base):
-        debug_base = os.path.abspath(os.path.join(r"C:\PDF-Processing", debug_base))
+        debug_base = os.path.abspath(debug_base)
     
     if subfolder:
         debug_folder = os.path.join(debug_base, subfolder)
@@ -385,6 +392,49 @@ def preprocess_line_removal(img, base_name, page_idx):
     
     return result_img
 
+def generate_corrected_pdf(original_pdf_path, processed_pages):
+    """
+    Generate a new PDF file from processed PIL Images.
+    
+    Args:
+        original_pdf_path: Path to the original PDF file
+        processed_pages: List of PIL Images (one per page)
+        
+    Returns:
+        str: Path to the generated corrected PDF, or None if failed
+    """
+    if not processed_pages:
+        return None
+    
+    try:
+        # Create temporary file for the corrected PDF
+        base_name = os.path.splitext(os.path.basename(original_pdf_path))[0]
+        temp_dir = os.path.dirname(original_pdf_path)
+        temp_pdf_path = os.path.join(temp_dir, f"{base_name}_corrected.pdf")
+        
+        # Convert all images to RGB mode (required for PDF)
+        rgb_pages = []
+        for page in processed_pages:
+            if page.mode != 'RGB':
+                rgb_pages.append(page.convert('RGB'))
+            else:
+                rgb_pages.append(page)
+        
+        # Save as multi-page PDF
+        if rgb_pages:
+            rgb_pages[0].save(
+                temp_pdf_path, 
+                "PDF", 
+                save_all=True, 
+                append_images=rgb_pages[1:] if len(rgb_pages) > 1 else []
+            )
+            print(f"Successfully generated corrected PDF: {temp_pdf_path}")
+            return temp_pdf_path
+        
+    except Exception as e:
+        print(f"Error generating corrected PDF: {e}")
+        return None
+
 def classify_document(file_path, extracted_text):
     """
     Identify and classify the document type based on the file content.
@@ -428,21 +478,31 @@ def extract_text_from_pdf(file_path):
     Saves debug images with original filename as prefix.
     Skips extraction of the top 60px of each page.
     
+    NEW: If any page requires orientation correction, generates a new PDF file
+    with all pages (corrected and uncorrected) in their proper orientation.
+    
     Returns:
         tuple: (extracted_text, bool indicating if any page had orientation corrected)
     """
-    debug_folder = r"C:\PDF-Processing\debug_imgs"
+    debug_folder = os.path.abspath("debug_imgs")
     os.makedirs(debug_folder, exist_ok=True)
     base_name = os.path.splitext(os.path.basename(file_path))[0]
     try:
         # Use higher DPI for faxes
-        pages = convert_from_path(
-            file_path, 
-            dpi=400, 
-            poppler_path=r"C:\PDF-Processing\poppler\Library\bin"
-        )
+        # Try system poppler first, then Windows path if available
+        try:
+            pages = convert_from_path(file_path, dpi=400)
+        except Exception:
+            # Fallback for Windows systems
+            pages = convert_from_path(
+                file_path, 
+                dpi=400, 
+                poppler_path=r"C:\PDF-Processing\poppler\Library\bin"
+            )
         text = ""
         any_page_orientation_corrected = False
+        processed_pages = []  # NEW: Collect processed images for PDF regeneration
+        
         for i, page in enumerate(pages):
             # Preprocessing step here with base_name and page index:
             proc_page, page_orientation_corrected = preprocess_fax_page(page, base_name, i)
@@ -450,6 +510,9 @@ def extract_text_from_pdf(file_path):
             # Track if any page had orientation correction
             if page_orientation_corrected:
                 any_page_orientation_corrected = True
+            
+            # NEW: Collect the processed page image
+            processed_pages.append(proc_page)
             
             # Save final processed image for backward compatibility
             debug_path = os.path.join(
@@ -462,6 +525,15 @@ def extract_text_from_pdf(file_path):
             cropped_page = proc_page.crop((0, 60, width, height))
             config = '--oem 1 --psm 3'
             text += pytesseract.image_to_string(cropped_page, config=config, lang='eng')
+        
+        # NEW: If orientation correction occurred, generate corrected PDF
+        if any_page_orientation_corrected and processed_pages:
+            corrected_pdf_path = generate_corrected_pdf(file_path, processed_pages)
+            if corrected_pdf_path:
+                # Replace the original file with the corrected one
+                shutil.move(corrected_pdf_path, file_path)
+                print(f"Generated corrected PDF with orientation fixes: {os.path.basename(file_path)}")
+        
         return text, any_page_orientation_corrected
     except Exception as e:
         print(f"Error processing PDF: {e}")
@@ -471,6 +543,9 @@ def extract_text_from_tif(file_path):
     """
     Use OCR to extract text from a TIF, skipping the top 60px.
     
+    NEW: If orientation correction occurs, generates a new TIF file
+    with the corrected orientation.
+    
     Returns:
         tuple: (extracted_text, bool indicating if orientation was corrected)
     """
@@ -478,7 +553,16 @@ def extract_text_from_tif(file_path):
     try:
         img = Image.open(file_path)
         proc_img, orientation_corrected = preprocess_fax_page(img, base_name, 0)
-        # Crop top 60px
+        
+        # NEW: If orientation correction occurred, save corrected TIF
+        if orientation_corrected:
+            # Convert to RGB if not already (for consistent saving)
+            if proc_img.mode != 'RGB':
+                proc_img = proc_img.convert('RGB')
+            proc_img.save(file_path)
+            print(f"Generated corrected TIF with orientation fixes: {os.path.basename(file_path)}")
+        
+        # Crop top 60px for OCR
         width, height = proc_img.size
         cropped_img = proc_img.crop((0, 60, width, height))
         config = '--oem 1 --psm 6'
