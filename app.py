@@ -31,6 +31,36 @@ def get_all_documents():
         for doc in docs
     ]
 
+def get_fax_status_documents():
+    """
+    Retrieve documents data for the FAX Document Processing Status page.
+    Includes all required columns with placeholders for missing data.
+    """
+    conn = get_db_connection()
+    docs = conn.execute(
+        "SELECT id, file_name, basename, document_type, flagged_for_reprocessing, orientation_corrected, processed_at FROM documents ORDER BY processed_at DESC"
+    ).fetchall()
+    conn.close()
+    
+    return [
+        {
+            "document_name": doc["basename"] or os.path.basename(doc["file_name"]),
+            # Date/Time Received - placeholder since not tracked in current schema
+            # TODO: Add 'received_at' column to track when document was first received
+            "date_received": "N/A",  # Placeholder - extend here when received_at is added
+            "date_processed": doc["processed_at"] if doc["processed_at"] else "N/A",
+            "orientation_changed": "Yes" if bool(doc["orientation_corrected"]) else "No",
+            "marked_reprocessing": "Yes" if bool(doc["flagged_for_reprocessing"]) else "No",
+            # Document Category - placeholder treatment per requirements
+            # TODO: Implement document classification logic and update this field
+            "document_category": doc["document_type"] if doc["document_type"] else "Unclassified",  # Placeholder - extend here when category logic is implemented
+            # Document Status - placeholder since not tracked in current schema  
+            # TODO: Add 'status' column to track processing status (e.g., 'Completed', 'Processing', 'Failed')
+            "document_status": "Processed"  # Placeholder - extend here when status tracking is added
+        }
+        for doc in docs
+    ]
+
 def get_document_text_and_flag(basename):
     conn = get_db_connection()
     doc = conn.execute(
@@ -56,9 +86,25 @@ def set_flag_for_reprocessing(basename, flag_value):
 def index():
     return render_template("index.html")
 
+@app.route("/fax_status")
+def fax_status():
+    """
+    FAX Document Processing Status page.
+    Displays a data grid view with filtering controls for document processing status.
+    """
+    return render_template("fax_status.html")
+
 @app.route("/api/documents")
 def api_documents():
     return jsonify(get_all_documents())
+
+@app.route("/api/fax_status")
+def api_fax_status():
+    """
+    API endpoint for FAX Document Processing Status data.
+    Returns document processing status data for DataTables.
+    """
+    return jsonify(get_fax_status_documents())
 
 @app.route("/api/document/<basename>/text")
 def api_document_text(basename):
