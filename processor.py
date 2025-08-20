@@ -5,6 +5,8 @@ import shutil
 import yaml
 import math
 import tempfile
+import time
+import datetime
 from pdf2image import convert_from_path
 from PIL import Image, ImageFilter, ImageEnhance
 import pytesseract
@@ -26,6 +28,68 @@ else:  # Unix/Linux systems
     WATCH_DIR = os.path.join(base_dir, "PDF_IN")    # Input folder for new documents
     WORK_DIR = os.path.join(base_dir, "PDF_working")  # Temporary processing folder
     FINAL_DIR = os.path.join(base_dir, "PDF_final")   # Final storage for processed documents
+
+def log_timing(step_name, duration, base_name, page_idx):
+    """
+    Log timing information for preprocessing steps.
+    
+    Args:
+        step_name: Name of the preprocessing step
+        duration: Duration in seconds  
+        base_name: Base filename being processed
+        page_idx: Page index
+    """
+    # Check if timing logging is enabled
+    if not CONFIG.get('debug', {}).get('log_timings', False):
+        return
+    
+    # Create logs directory if it doesn't exist
+    logs_dir = os.path.abspath("Pre_Proc_logs")
+    os.makedirs(logs_dir, exist_ok=True)
+    
+    # Create timestamped log filename
+    timestamp = datetime.datetime.now().strftime("%Y%m%d")
+    log_file = os.path.join(logs_dir, f"preprocessing_timings_{timestamp}.log")
+    
+    # Format timing entry
+    current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    log_entry = f"[{current_time}] {base_name}_page_{page_idx} | {step_name} | {duration:.3f}s\n"
+    
+    # Append to log file
+    try:
+        with open(log_file, 'a', encoding='utf-8') as f:
+            f.write(log_entry)
+    except Exception as e:
+        # Silently fail to avoid breaking processing if logging fails
+        pass
+
+def time_preprocessing_step(func):
+    """
+    Decorator to time preprocessing steps and log if enabled.
+    
+    Args:
+        func: Preprocessing function to wrap
+        
+    Returns:
+        Wrapped function that logs timing
+    """
+    def wrapper(*args, **kwargs):
+        # Extract step name from function name
+        step_name = func.__name__.replace('preprocess_', '')
+        
+        # Get base_name and page_idx from args if available
+        base_name = args[1] if len(args) > 1 else kwargs.get('base_name', 'unknown')
+        page_idx = args[2] if len(args) > 2 else kwargs.get('page_idx', 0)
+        
+        start_time = time.time()
+        result = func(*args, **kwargs)
+        end_time = time.time()
+        
+        duration = end_time - start_time
+        log_timing(step_name, duration, base_name, page_idx)
+        
+        return result
+    return wrapper
 
 # Load OCR preprocessing configuration
 def load_config():
@@ -52,6 +116,7 @@ def get_default_config():
         'debug': {
             'save_images': True,
             'base_folder': 'debug_imgs',
+            'log_timings': False,
             'subfolders': {
                 'original': 'original',
                 'orientation': 'orientation',
@@ -122,6 +187,7 @@ def save_debug_image(img, base_name, page_idx, step_name, subfolder=None):
     img.save(debug_path)
     return debug_path
 
+@time_preprocessing_step
 def preprocess_orientation_correction(img, base_name, page_idx):
     """
     Apply page orientation correction using Tesseract's OSD (Orientation and Script Detection).
@@ -173,6 +239,7 @@ def preprocess_orientation_correction(img, base_name, page_idx):
         # Return original image if orientation detection fails
         return img, False
 
+@time_preprocessing_step
 def preprocess_basic(img, base_name, page_idx):
     """
     Apply basic preprocessing steps (existing functionality).
@@ -228,6 +295,7 @@ def preprocess_basic(img, base_name, page_idx):
     
     return pil_img
 
+@time_preprocessing_step
 def preprocess_noise_removal(img, base_name, page_idx):
     """
     Apply noise removal preprocessing.
@@ -274,6 +342,7 @@ def preprocess_noise_removal(img, base_name, page_idx):
     
     return result_img
 
+@time_preprocessing_step
 def preprocess_morphological_operations(img, base_name, page_idx):
     """
     Apply morphological operations.
@@ -328,6 +397,7 @@ def preprocess_morphological_operations(img, base_name, page_idx):
     
     return result_img
 
+@time_preprocessing_step
 def preprocess_line_removal(img, base_name, page_idx):
     """
     Apply line and border removal using Hough Line Transform.

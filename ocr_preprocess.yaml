@@ -63,6 +63,7 @@ line_removal:
 debug:
   save_images: true
   base_folder: "debug_imgs"  # Relative to processing directory or absolute path
+  log_timings: false  # Toggle timing log output for pre-processing steps
   subfolders:
     original: "original"
     orientation: "orientation"

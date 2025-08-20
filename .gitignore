@@ -32,3 +32,9 @@ C:\PDF-Processing/debug_imgs/
 # Processing directories (auto-created)
 PDF-Processing/
 C:\PDF-Processing/
+
+# Timing logs (auto-generated during preprocessing) 
+Pre_Proc_logs/
+
+# Test files (development)
+test_timing_feature.py
