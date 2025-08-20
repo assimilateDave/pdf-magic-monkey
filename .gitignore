@@ -26,4 +26,9 @@ env/
 # Debug images (auto-generated during OCR preprocessing)
 debug_imgs/
 */debug_imgs/
+**/debug_imgs/
 C:\PDF-Processing/debug_imgs/
+
+# Processing directories (auto-created)
+PDF-Processing/
+C:\PDF-Processing/
