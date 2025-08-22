@@ -38,3 +38,9 @@ Pre_Proc_logs/
 
 # Test files (development)
 test_timing_feature.py
+
+# medSpaCy trained models (should be generated locally)
+clinical_classifier_model.pkl
+
+# spaCy models downloaded during setup
+*.nlp/

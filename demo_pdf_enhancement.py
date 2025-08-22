@@ -94,7 +94,7 @@ def main():
     try:
         # Process the document
         print("\n2. Processing document through enhanced pipeline...")
-        final_file, doc_type, extracted_text, orientation_corrected = process_document(demo_pdf)
+        final_file, doc_type, extracted_text, orientation_corrected, extracted_entities = process_document(demo_pdf)
         
         print(f"   Final file: {os.path.basename(final_file)}")
         print(f"   Document type: {doc_type}")

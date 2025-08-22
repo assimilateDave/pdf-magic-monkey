@@ -36,17 +36,25 @@ def init_db():
         except sqlite3.OperationalError:
             # Column already exists or other error, ignore
             pass
+        
+        # Add extracted_entities column for medSpaCy integration if it doesn't exist
+        try:
+            conn.execute("ALTER TABLE documents ADD COLUMN extracted_entities TEXT")
+        except sqlite3.OperationalError:
+            # Column already exists or other error, ignore
+            pass
     return conn
 
-def insert_document(final_file_path, document_type, extracted_text, orientation_corrected=0):
+def insert_document(final_file_path, document_type, extracted_text, orientation_corrected=0, extracted_entities=None):
     """
     Insert a document record with the final file path.
     file_name stores the full path, basename stores just the filename for compatibility.
+    extracted_entities stores JSON string of clinical entities from medSpaCy analysis.
     """
     conn = sqlite3.connect(DB_NAME)
     basename = os.path.basename(final_file_path)
     with conn:
         conn.execute(
-            "INSERT INTO documents (file_name, basename, document_type, extracted_text, orientation_corrected) VALUES (?, ?, ?, ?, ?)",
-            (final_file_path, basename, document_type, extracted_text, orientation_corrected)
+            "INSERT INTO documents (file_name, basename, document_type, extracted_text, orientation_corrected, extracted_entities) VALUES (?, ?, ?, ?, ?, ?)",
+            (final_file_path, basename, document_type, extracted_text, orientation_corrected, extracted_entities)
         )

@@ -7,9 +7,18 @@ import math
 import tempfile
 import time
 import datetime
+import json
 from pdf2image import convert_from_path
 from PIL import Image, ImageFilter, ImageEnhance
 import pytesseract
+
+# Import clinical document classifier for medSpaCy integration
+try:
+    from clinical_document_classifier import ClinicalDocumentClassifier
+    MEDSPACY_AVAILABLE = True
+except ImportError:
+    print("Warning: medSpaCy classifier not available. Using fallback classification.")
+    MEDSPACY_AVAILABLE = False
 
 # Set tesseract path based on the operating system
 if os.name == 'nt':  # Windows
@@ -508,17 +517,62 @@ def generate_corrected_pdf(original_pdf_path, processed_pages):
 def classify_document(file_path, extracted_text):
     """
     Identify and classify the document type based on the file content.
-    You can start with some simple keyword matching; later you can replace this with a machine
-    learning model or more complex logic.
+    Uses medSpaCy clinical document classifier when available, falls back to keyword matching.
+    
+    Returns:
+        tuple: (document_type, extracted_entities_json)
+        - document_type: Classification result (referral, order, progress_note, correspondence, other)
+        - extracted_entities_json: JSON string of clinical entities (None if medSpaCy not available)
     """
-    if "invoice" in extracted_text.lower():
-        return "Invoice"
-    elif "receipt" in extracted_text.lower():
-        return "Receipt"
-    elif "report" in extracted_text.lower():
-        return "Report"
+    extracted_entities_json = None
+    
+    # Try to use medSpaCy clinical classifier
+    if MEDSPACY_AVAILABLE:
+        try:
+            # Initialize classifier (will load existing model if available)
+            classifier = ClinicalDocumentClassifier()
+            
+            # Get prediction and entity extraction
+            result = classifier.predict(extracted_text)
+            
+            document_type = result['document_type']
+            extracted_entities_json = json.dumps(result['extracted_entities'])
+            
+            print(f"Clinical classification: {document_type} (confidence: {result['confidence']:.2f})")
+            print(f"Entities found: {len(result['extracted_entities']['clinical_entities'])}")
+            
+            return document_type, extracted_entities_json
+            
+        except Exception as e:
+            print(f"Error using clinical classifier, falling back to keyword matching: {e}")
+    
+    # Fallback to original keyword-based classification
+    text_lower = extracted_text.lower()
+    
+    # Clinical document keywords (updated for medical context)
+    if any(word in text_lower for word in ["referral", "refer", "consultation", "please see"]):
+        document_type = "referral"
+    elif any(word in text_lower for word in ["order", "prescription", "rx", "lab order", "prescribe"]):
+        document_type = "order"  
+    elif any(word in text_lower for word in ["progress note", "soap", "assessment", "plan", "clinical note"]):
+        document_type = "progress_note"
+    elif any(word in text_lower for word in ["letter", "dear", "sincerely", "correspondence"]):
+        document_type = "correspondence"
+    elif any(word in text_lower for word in ["invoice", "receipt", "report"]):
+        # Keep original classifications for non-clinical documents
+        if "invoice" in text_lower:
+            document_type = "Invoice"
+        elif "receipt" in text_lower:
+            document_type = "Receipt" 
+        elif "report" in text_lower:
+            document_type = "Report"
+        else:
+            document_type = "other"
     else:
-        return "Unknown"
+        document_type = "other"
+    
+    print(f"Keyword-based classification: {document_type}")
+    return document_type, extracted_entities_json
 
 def preprocess_fax_page(pil_img, base_name="image", page_idx=0):
     """
@@ -649,12 +703,12 @@ def process_document(file_path):
     
     NEW WORKFLOW:
     1. Move file from WATCH_DIR to WORK_DIR for processing
-    2. Extract text and classify the document
+    2. Extract text and classify the document (now with medSpaCy integration)
     3. Move file from WORK_DIR to FINAL_DIR after successful processing
     4. Return final file path (not just basename) for database storage
     
     Returns:
-        tuple: (final_file_path, document_type, extracted_text, orientation_corrected)
+        tuple: (final_file_path, document_type, extracted_text, orientation_corrected, extracted_entities)
     """
     print("PROCESS_DOCUMENT CALLED")
     work_file = move_to_work_folder(file_path)
@@ -668,9 +722,10 @@ def process_document(file_path):
     else:
         print("Unsupported file format")
     
-    document_type = classify_document(work_file, extracted_text)
+    # Classify document and extract entities using medSpaCy when available
+    document_type, extracted_entities = classify_document(work_file, extracted_text)
     
     # Move to final folder after successful processing
     final_file = move_to_final_folder(work_file)
     
-    return final_file, document_type, extracted_text, orientation_corrected
+    return final_file, document_type, extracted_text, orientation_corrected, extracted_entities
