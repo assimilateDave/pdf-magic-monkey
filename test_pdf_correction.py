@@ -251,7 +251,7 @@ def test_enhanced_behavior():
         print(f"   Processing file: {watch_pdf}")
         
         # Process the document
-        final_file, doc_type, extracted_text, orientation_corrected = process_document(watch_pdf)
+        final_file, doc_type, extracted_text, orientation_corrected, extracted_entities = process_document(watch_pdf)
         
         print(f"   Final file: {final_file}")
         print(f"   Document type: {doc_type}")
@@ -328,7 +328,7 @@ def test_full_workflow():
         print(f"   Processing file: {watch_pdf}")
         
         # Process the document
-        final_file, doc_type, extracted_text, orientation_corrected = process_document(watch_pdf)
+        final_file, doc_type, extracted_text, orientation_corrected, extracted_entities = process_document(watch_pdf)
         
         print(f"   Final file: {final_file}")
         print(f"   Document type: {doc_type}")
