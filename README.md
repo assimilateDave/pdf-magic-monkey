@@ -239,3 +239,93 @@ The system now automatically tracks when document orientation correction is appl
 4. **Display**: Users can see which documents required orientation correction in the web interface
 
 This ensures users know if the PDF they see has been automatically rotated for correct orientation, providing transparency about the processing steps applied.
+
+## Clinical Document Classification with medSpaCy ⭐ NEW
+
+The system now includes advanced clinical document classification and entity extraction powered by medSpaCy, specifically designed for medical documents:
+
+### Features
+
+- **Clinical Document Types**: Automatically classifies documents as:
+  - `referral`: Referral letters and consultation requests
+  - `order`: Medical orders, prescriptions, lab orders
+  - `progress_note`: Progress notes, SOAP notes, clinical assessments
+  - `correspondence`: Letters and communications between providers
+  - `other`: Other document types
+- **Entity Extraction**: Extracts clinical entities including medications, conditions, procedures, and anatomy
+- **Machine Learning**: Uses scikit-learn with customizable training data
+- **Fallback Support**: Falls back to keyword-based classification if medSpaCy is unavailable
+
+### Quick Start
+
+1. **Install Dependencies** (included in requirements.txt):
+   ```bash
+   pip install medspacy scikit-learn
+   python -m spacy download en_core_web_sm
+   ```
+
+2. **Train the Classifier**:
+   ```bash
+   python example_medspacy_integration.py
+   ```
+
+3. **Update Database Schema**:
+   ```sql
+   ALTER TABLE documents ADD COLUMN extracted_entities TEXT;
+   ```
+
+### Database Schema
+
+The enhanced database now includes:
+
+```sql
+CREATE TABLE documents (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    file_name TEXT NOT NULL,              -- Full path to final file location
+    basename TEXT,                        -- Just the filename for UI display
+    document_type TEXT,                   -- Clinical document type (referral, order, etc.)
+    extracted_text TEXT,                  -- OCR extracted text
+    extracted_entities TEXT,              -- ⭐ NEW: JSON with clinical entities
+    flagged_for_reprocessing INTEGER DEFAULT 0,
+    orientation_corrected INTEGER DEFAULT 0,
+    processed_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+### Usage Examples
+
+**Query by Document Type**:
+```sql
+SELECT * FROM documents WHERE document_type = 'referral';
+SELECT * FROM documents WHERE document_type = 'order';
+```
+
+**Search Clinical Entities**:
+```sql
+SELECT * FROM documents WHERE extracted_entities LIKE '%hypertension%';
+SELECT * FROM documents WHERE extracted_entities LIKE '%medication%';
+```
+
+**Document Type Distribution**:
+```sql
+SELECT document_type, COUNT(*) as count 
+FROM documents 
+GROUP BY document_type 
+ORDER BY count DESC;
+```
+
+### Customization
+
+To customize the classifier for your specific clinical documents:
+
+1. **Edit Training Data**: Modify the `train_data` list in `example_medspacy_integration.py`
+2. **Add Examples**: Include diverse examples of each document type
+3. **Retrain**: Run the training script to update the model
+4. **Test**: The system will automatically use your custom-trained model
+
+### Integration Details
+
+- **Processing Workflow**: OCR Text Extraction → medSpaCy Classification & Entity Extraction → Database Storage
+- **Automatic Integration**: Classification occurs automatically after OCR in the existing pipeline
+- **Backward Compatibility**: Existing functionality is preserved; new features enhance the system
+- **Performance**: Entity extraction adds minimal processing time to the pipeline
